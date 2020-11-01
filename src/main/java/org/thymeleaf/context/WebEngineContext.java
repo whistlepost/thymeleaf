@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
@@ -93,7 +94,7 @@ public class WebEngineContext extends AbstractEngineContext implements IEngineCo
     private final ServletContext servletContext;
 
     private final RequestAttributesVariablesMap requestAttributesVariablesMap;
-    private final Map<String,Object> requestParametersVariablesMap;
+    private final Map<String,RequestParameterValues> requestParametersVariablesMap;
     private final Map<String,Object> sessionAttributesVariablesMap;
     private final Map<String,Object> applicationAttributesVariablesMap;
 
@@ -356,7 +357,7 @@ public class WebEngineContext extends AbstractEngineContext implements IEngineCo
 
 
 
-    private static final class SessionAttributesMap extends NoOpMapImpl {
+    private static final class SessionAttributesMap extends NoOpMapImpl<Object> {
 
         private final HttpSession session;
 
@@ -544,7 +545,7 @@ public class WebEngineContext extends AbstractEngineContext implements IEngineCo
 
 
 
-    private static final class RequestParametersMap extends NoOpMapImpl {
+    private static final class RequestParametersMap extends NoOpMapImpl<RequestParameterValues> {
 
         private final HttpServletRequest request;
 
@@ -581,7 +582,7 @@ public class WebEngineContext extends AbstractEngineContext implements IEngineCo
         }
 
         @Override
-        public Object get(final Object key) {
+        public RequestParameterValues get(final Object key) {
             final String[] parameterValues = this.request.getParameterValues(key != null? key.toString() : null);
             if (parameterValues == null) {
                 return null;
@@ -595,13 +596,16 @@ public class WebEngineContext extends AbstractEngineContext implements IEngineCo
         }
 
         @Override
-        public Collection<Object> values() {
-            return this.request.getParameterMap().values();
+        public Collection<RequestParameterValues> values() {
+            return this.request.getParameterMap().values().stream()
+                    .map(RequestParameterValues::new).collect(Collectors.toList());
         }
 
         @Override
-        public Set<Map.Entry<String,Object>> entrySet() {
-            return this.request.getParameterMap().entrySet();
+        public Set<Map.Entry<String,RequestParameterValues>> entrySet() {
+            return this.request.getParameterMap().entrySet().stream()
+                    .map(e -> new MapEntry<>(e.getKey(), new RequestParameterValues(e.getValue())))
+                    .collect(Collectors.toSet());
         }
 
     }
@@ -1225,7 +1229,7 @@ public class WebEngineContext extends AbstractEngineContext implements IEngineCo
 
 
 
-    private abstract static class NoOpMapImpl implements Map<String,Object> {
+    private abstract static class NoOpMapImpl<V> implements Map<String,V> {
 
         protected NoOpMapImpl() {
             super();
@@ -1247,19 +1251,19 @@ public class WebEngineContext extends AbstractEngineContext implements IEngineCo
             return false;
         }
 
-        public Object get(final Object key) {
+        public V get(final Object key) {
             return null;
         }
 
-        public Object put(final String key, final Object value) {
+        public V put(final String key, final V value) {
             throw new UnsupportedOperationException("Cannot add new entry: map is immutable");
         }
 
-        public Object remove(final Object key) {
+        public V remove(final Object key) {
             throw new UnsupportedOperationException("Cannot remove entry: map is immutable");
         }
 
-        public void putAll(final Map<? extends String, ? extends Object> m) {
+        public void putAll(final Map<? extends String, ? extends V> m) {
             throw new UnsupportedOperationException("Cannot add new entry: map is immutable");
         }
 
@@ -1271,21 +1275,21 @@ public class WebEngineContext extends AbstractEngineContext implements IEngineCo
             return Collections.emptySet();
         }
 
-        public Collection<Object> values() {
+        public Collection<V> values() {
             return Collections.emptyList();
         }
 
-        public Set<Entry<String,Object>> entrySet() {
+        public Set<Entry<String,V>> entrySet() {
             return Collections.emptySet();
         }
 
 
-        static final class MapEntry implements Map.Entry<String,Object> {
+        static final class MapEntry<V> implements Map.Entry<String,V> {
 
             private final String key;
-            private final Object value;
+            private final V value;
 
-            MapEntry(final String key, final Object value) {
+            MapEntry(final String key, final V value) {
                 super();
                 this.key = key;
                 this.value = value;
@@ -1295,7 +1299,7 @@ public class WebEngineContext extends AbstractEngineContext implements IEngineCo
                 return this.key;
             }
 
-            public Object getValue() {
+            public V getValue() {
                 return this.value;
             }
 
